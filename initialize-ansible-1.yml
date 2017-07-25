@@ -1,0 +1,62 @@
+---
+
+
+- name: 'set up: /etc/ansible/hosts; passwordless sudo; PATH+=pypy'
+  hosts:
+    - localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: create ansible directories and files
+      file:
+        path: "{{ item.path }}"
+        state: "{{ item.state }}"
+        owner: "{{ item.owner | default(omit) }}"
+        group: "{{ item.group | default(omit) }}"
+        mode: "{{ item.mode | default(omit) }}"
+      with_items:
+        - path: /etc/ansible
+          state: directory
+
+    - name: >
+        register README.md file stat to pick current USER
+        -- for /etc/sudoers.d/ansible
+      stat:
+        path: './README.md'
+      register: readme
+
+    - name: initialize ansible directories and files, make sudo passwordless
+      copy:
+        dest: "{{ item.dest }}"
+        content: "{{ item.content | default('') }}{{'\n'}}"
+        force: "{{ item.force | default('false') }}"
+        owner: "{{ item.owner | default(omit) }}"
+        group: "{{ item.group | default(omit) }}"
+        mode: "{{ item.mode | default(omit) }}"
+        validate: "{{ item.validate | default(omit) }}"
+      with_items:
+        - dest: /etc/ansible/hosts
+          content: |
+              [laptop]
+              localhost ansible_host=127.0.0.1 ansible_connection=local
+          owner: root
+        - dest: /etc/sudoers.d/ansible
+          content: |
+              Defaults !requiretty
+              {{ readme.stat.pw_name }} ALL=(ALL) NOPASSWD: /usr/local/share/pypy/ansible
+              {{ readme.stat.pw_name }} ALL=(ALL) NOPASSWD: /usr/local/share/pypy/ansible-playbook
+          owner: root
+          group: wheel
+          mode: 'u=r,g=r,o-rwx'
+          validate: 'visudo -cf %s'
+
+    - name: update PATH
+      become: true
+      lineinfile:
+        path: "{{ item.file }}"
+        line: "{{ item.path }}"
+        create: true
+      with_items:
+        - file: /etc/paths.d/20-localhost
+          path: /usr/local/share/pypy

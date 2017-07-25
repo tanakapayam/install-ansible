@@ -1,0 +1,27 @@
+---
+
+
+- name: 'install: jq, make, yamllint, yq'
+  hosts:
+    - localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: brew install
+      become: false
+      homebrew:
+        formula: "{{ item }}"
+        update_homebrew: true
+      with_items:
+        - jq
+        - make
+
+    - name: pip install
+      become: false
+      pip:
+        name: "{{ item }}"
+        executable: pip_pypy
+      with_items:
+        - yamllint
+        - yq
